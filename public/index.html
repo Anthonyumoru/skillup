@@ -1,0 +1,80 @@
+<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SkillUp</title><style>
+body{font-family:sans-serif;background:#f5f5f5;padding:20px}
+.card{background:white;padding:20px;border-radius:10px;max-width:400px;margin:30px auto}
+input,button{width:100%;padding:12px;margin:8px 0;border:1px solid #ddd;border-radius:8px}
+button{background:#16a34a;color:white;border:none;cursor:pointer}
+.hidden{display:none}.pay-box{background:#fef3c7;padding:15px;border-radius:8px}
+.code{font-size:20px;font-weight:700;color:#d97706}
+</style></head><body>
+
+<div class="card" id="login">
+<h2>SkillUp Pro</h2>
+<input id="phone" placeholder="Phone number">
+<button onclick="login()">Start</button>
+<button onclick="showAdmin()">Admin</button>
+</div>
+
+<div class="card hidden" id="dash">
+<h3 id="status"></h3>
+<div id="pay" class="pay-box hidden">
+<b>Pay ₦500</b><br>Bank: <span id="bank"></span><br>
+Account: <span id="acc"></span><br>Amount: ₦<span id="amt"></span><br>
+Code: <div class="code" id="code"></div>
+</div>
+<button onclick="openLesson()">Open WhatsApp Lesson</button>
+<button onclick="showAdmin()">Admin</button>
+</div>
+
+<div class="card hidden" id="admin">
+<h2>Admin</h2>
+<input id="ap" placeholder="Phone" value="09122274678">
+<input id="apass" type="password" placeholder="Pass">
+<button onclick="alogin()">Login</button>
+<div id="plist"></div>
+<button onclick="showUser()">Back</button>
+</div>
+
+<script>
+let uid=0;
+function show(id){document.querySelectorAll('.card').forEach(c=>c.classList.add('hidden'));document.getElementById(id).classList.remove('hidden')}
+function showAdmin(){show('admin')}
+function showUser(){show('login')}
+
+async function login(){
+  const phone=document.getElementById('phone').value;
+  const r=await fetch('/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone})});
+  const u=await r.json(); uid=u.id;
+  if(u.has_paid){document.getElementById('status').textContent='✅ Unlocked'}
+  else {document.getElementById('status').textContent='🔒 Locked';getPay()}
+  show('dash');
+}
+
+async function getPay(){
+  const r=await fetch('/get-payment',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:uid})});
+  const d=await r.json();
+  document.getElementById('bank').textContent=d.bank;
+  document.getElementById('acc').textContent=d.account;
+  document.getElementById('amt').textContent=d.amount;
+  document.getElementById('code').textContent=d.code;
+  document.getElementById('pay').classList.remove('hidden');
+}
+
+async function openLesson(){
+  const r=await fetch('/lessons',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({skill_id:'whatsapp',user_id:uid})});
+  const d=await r.json();
+  alert(d.error||d[0].question);
+}
+
+async function alogin(){
+  const r=await fetch('/admin-login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:ap.value,password:apass.value})});
+  const d=await r.json();
+  if(d.error)return alert(d.error);
+  plist.innerHTML=d.payments.map(p=>`<div><b>${p.phone}</b><br>Code:${p.code}<br><button onclick="verify('${p.code}')">Verify</button></div>`).join('');
+}
+
+async function verify(code){
+  await fetch('/verify-payment',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})});
+  alert('Unlocked'); alogin();
+}
+</script></body></html>
