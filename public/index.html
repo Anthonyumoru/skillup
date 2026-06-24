@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SkillUp Pro</title>
+<style>
+body{font-family:sans-serif;background:#f5f5f5;margin:0;padding:20px}
+.card{background:white;padding:20px;border-radius:10px;max-width:500px;margin:30px auto;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.1)}
+input,button{width:100%;padding:12px;margin:8px 0;border:1px solid #ddd;border-radius:8px;font-size:16px;box-sizing:border-box}
+button{background:#16a34a;color:white;border:none;cursor:pointer;font-weight:600}
+button:active{transform:scale(0.98)}
+.skill{padding:15px;background:#f0f9ff;margin:8px 0;border-radius:8px;text-align:left;cursor:pointer}
+.locked{opacity:0.5;cursor:not-allowed}
+.hidden{display:none}
+.pay-box{background:#fef3c7;padding:15px;border-radius:8px;margin:15px 0;border-left:4px solid #f59e0b;text-align:left}
+.code{font-size:20px;font-weight:700;color:#d97706}
+.payment-item{background:#f9fafb;padding:12px;margin:8px 0;border-radius:8px;text-align:left;border-left:4px solid #f59e0b}
+.verify-btn{background:#dc2626}
+.admin-link{color:#3b82f6;margin-top:15px;cursor:pointer;text-decoration:underline;font-size:14px}
+h2,h3{margin-top:0}
+</style>
+</head>
+<body>
+
+<!-- USER LOGIN -->
+<div class="card" id="login">
+  <h2>SkillUp Pro 📚</h2>
+  <p style="color:#666">Learn skills. Pay once, access forever</p>
+  <input id="phone" placeholder="Enter phone number">
+  <button onclick="login()">Start Learning</button>
+  <div class="admin-link" onclick="showAdmin()">👨‍💼 Admin Login</div>
+</div>
+
+<!-- USER DASHBOARD -->
+<div class="card hidden" id="dash">
+  <h3 id="status"></h3>
+  <div id="paySection" class="hidden">
+    <div class="pay-box">
+      <b>Pay ₦500 to Unlock All Skills</b>
+      <p><b>Bank:</b> <span id="bank"></span></p>
+      <p><b>Account:</b> <span id="account"></span></p>
+      <p><b>Amount:</b> ₦<span id="amount"></span></p>
+      <p><b>Code/Narration:</b></p>
+      <div class="code" id="payCode"></div>
+      <p style="font-size:12px;color:#666">Transfer money + send screenshot to admin</p>
+    </div>
+  </div>
+  <div id="skills"></div>
+  <div class="admin-link" onclick="showAdmin()">👨‍💼 Admin Login</div>
+</div>
+
+<!-- LESSON -->
+<div class="card hidden" id="lesson">
+  <h3 id="q"></h3>
+  <input id="ans" placeholder="Type answer">
+  <button onclick="submit()">Submit</button>
+  <button onclick="back()">Back</button>
+</div>
+
+<!-- ADMIN LOGIN -->
+<div class="card hidden" id="adminLogin">
+  <h2>Admin Panel</h2>
+  <input id="adminPhone" placeholder="Admin phone" value="09122274678">
+  <input id="adminPass" type="password" placeholder="Password">
+  <button onclick="adminLogin()">Login</button>
+  <div class="admin-link" onclick="showUser()">← Back to User</div>
+</div>
+
+<!-- ADMIN PANEL -->
+<div class="card hidden" id="adminPanel">
+  <h2>Pending Payments</h2>
+  <div id="paymentsList"></div>
+  <div class="admin-link" onclick="showUser()">← Back to User</div>
+</div>
+
+<script>
+let userId = 0;
+
+function showScreen(id) {
+  document.querySelectorAll('.card').forEach(c => c.classList.add('hidden'));
+  document.getElementById(id).classList.remove('hidden');
+}
+
+function showAdmin() { showScreen('adminLogin'); }
+function showUser() { showScreen('login'); }
+
+async function login() {
+  const phone = document.getElementById('phone').value;
+  if(!phone) return alert('Enter phone');
+
+  try {
+    const res = await fetch('/register',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({phone})
+    });
+
+    if(!res.ok) {
+      const text = await res.text();
+      return alert('Server error: ' + text);
+    }
+
+    const user = await res.json();
+    userId = user.id;
+    loadUser();
+    showScreen('dash');
+  } catch(err) {
+    alert('Network error: ' + err.message);
+  }
+}
+
+async function loadUser() {
+  try {
+    const res = await fetch('/user',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:userId})});
+    const user = await res.json();
+
+    const skillsRes = await fetch('/skills');
+    const skills = await skillsRes.json();
+
+    if(user.has_paid) {
+      document.getElementById('status').textContent = '✅ Access Granted';
+      document.getElementById('skills').innerHTML = skills.map(s=>`<div class="skill" onclick="openLesson('${s.id}')">${s.icon} <b>${s.name}</b></div>`).join('');
+    } else {
+      document.getElementById('status').textContent = '🔒 Locked - Pay ₦500';
+      document.getElementById('paySection').classList.remove('hidden');
+      getPayment();
+      document.getElementById('skills').innerHTML = skills.map(s=>`<div class="skill locked">${s.icon} <b>${s.name}</b> - Locked</div>`).join('');
+    }
+  } catch(err) {
+    alert('Error loading user: ' + err.message);
+  }
+}
+
+async function getPayment() {
+  try {
+    const res = await fetch('/get-payment',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id})});
+    const data = await res.json();
+    document.getElementById('bank').textContent = data.bank;
+    document.getElementById('account').textContent = data.account;
+    document.getElementById('amount').textContent = data.amount;
+    document.getElementById('payCode').textContent = data.code;
+  } catch(err) {
+    alert('Error getting payment: ' + err.message);
+  }
+}
+
+async function openLesson(skillId) {
+  try {
+    const res = await fetch('/lessons',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({skill_id:skillId, user_id})});
+    const data = await res.json();
+    if(data.error) return alert(data.error);
+    document.getElementById('q').textContent = data[0].question;
+    showScreen('lesson');
+  } catch(err) {
+    alert('Error opening lesson: ' + err.message);
+  }
+}
+
+async function submit() {
+  try {
+    await fetch('/submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id})});
+    alert('Lesson completed!');
+    back();
+  } catch(err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+function back() { showScreen('dash'); }
+
+async function adminLogin() {
+  const phone = document.getElementById('adminPhone').value;
+  const password = document.getElementById('adminPass').value;
+
+  try {
+    const res = await fetch('/admin-login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone, password})});
+    const data = await res.json();
+
+    if(data.error) return alert(data.error);
+
+    let html = '';
+    if(data.payments.length === 0) {
+      html = '<p style="color:#666">No pending payments</p>';
+    } else {
+      data.payments.forEach(p => {
+        html += `<div class="payment-item">
+          <b>Phone:</b> ${p.phone}<br>
+          <b>Code:</b> ${p.code}<br>
+          <b>Amount:</b> ₦${p.amount}<br>
+          <button class="verify-btn" onclick="verifyPayment('${p.code}')">Verify Payment</button>
+        </div>`;
+      });
+    }
+    document.getElementById('paymentsList').innerHTML = html;
+    showScreen('adminPanel');
+  } catch(err) {
+    alert('Admin login error: ' + err.message);
+  }
+}
+
+async function verifyPayment(code) {
+  try {
+    const res = await fetch('/verify-payment',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})});
+    const data = await res.json();
+    alert(data.msg);
+    adminLogin();
+  } catch(err) {
+    alert('Error: ' + err.message);
+  }
+}
+</script>
+</body>
+</html>
