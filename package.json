@@ -10,3 +10,37 @@
     "sqlite3": "^5.1.6"
   }
 }
+// Auto-create skills table + seed data on startup
+const { Pool } = require('pg');
+const pool = new Pool({ 
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
+
+async function initDB() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS skills (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        icon TEXT,
+        total_lessons INTEGER DEFAULT 0,
+        difficulty TEXT DEFAULT 'Easy'
+      )
+    `);
+    
+    await pool.query(`
+      INSERT INTO skills (id, name, icon, total_lessons, difficulty) VALUES 
+      ('coding', 'Web Development', '💻', 3, 'Medium'),
+      ('baking', 'Baking & Pastries', '🧁', 3, 'Easy'),
+      ('tailor', 'Fashion & Tailoring', '✂️', 3, 'Easy'),
+      ('phone_repair', 'Mobile Phone Repair', '📱', 3, 'Medium')
+      ON CONFLICT (id) DO NOTHING
+    `);
+    console.log('DB ready + skills seeded ✅');
+  } catch (err) {
+    console.log('DB init error:', err.message);
+  }
+}
+
+initDB();
