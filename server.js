@@ -7,7 +7,7 @@ const PORT = process.env.PORT || 3000;
 
 // YOUR DETAILS - CHANGE THESE
 const ADMIN_PHONE = '09122274678'; // Your phone only
-const ADMIN_PASS = 'admin123'; // Your admin password
+const ADMIN_PASS = 'anthony'; // Your admin password
 const COURSE_PRICE = 500;
 const BANK_ACCOUNT = '0224926246';
 const BANK_NAME = 'GTBank';
